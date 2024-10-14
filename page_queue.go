@@ -53,6 +53,8 @@ type QueuePage struct {
 	logger logger.LoggerInterface
 
 	songInfoTemplate *template.Template
+
+	coverArtCache Cache[image.Image]
 }
 
 var STMPS_LOGO image.Image
@@ -170,6 +172,48 @@ func (ui *Ui) createQueuePage() *QueuePage {
 		starIdList: ui.starIdList,
 	}
 
+	queuePage.coverArtCache = NewCache(
+		// zero value
+		STMPS_LOGO,
+		// function that loads assets; can be slow
+		ui.connection.GetCoverArt,
+		// function that gets called when the actual asset is loaded
+		func(imgId string, img image.Image) {
+			row, _ := queuePage.queueList.GetSelection()
+			// If nothing is selected, set the image to the logo
+			if row >= len(queuePage.queueData.playerQueue) || row < 0 {
+				ui.app.QueueUpdate(func() {
+					queuePage.coverArt.SetImage(STMPS_LOGO)
+				})
+				return
+			}
+			// If the fetched asset isn't the asset for the current song,
+			// just skip it.
+			currentSong := queuePage.queueData.playerQueue[row]
+			if currentSong.CoverArtId != imgId {
+				return
+			}
+			// Otherwise, the asset is for the current song, so update it
+			ui.app.QueueUpdate(func() {
+				queuePage.coverArt.SetImage(img)
+			})
+		},
+		// function called to check if asset is invalid:
+		// true if it can be purged from the cache, false if it's still needed
+		func(assetId string) bool {
+			for _, song := range queuePage.queueData.playerQueue {
+				if song.CoverArtId == assetId {
+					return false
+				}
+			}
+			// Didn't find a song that needs the asset; purge it.
+			return true
+		},
+		// How frequently we check for invalid assets
+		time.Minute,
+		ui.logger,
+	)
+
 	return &queuePage
 }
 
@@ -182,15 +226,7 @@ func (q *QueuePage) changeSelection(row, column int) {
 	currentSong := q.queueData.playerQueue[row]
 	art := STMPS_LOGO
 	if currentSong.CoverArtId != "" {
-		if nart, err := q.ui.connection.GetCoverArt(currentSong.CoverArtId); err == nil {
-			if nart != nil {
-				art = nart
-			} else {
-				q.logger.Printf("%q cover art %s was unexpectedly nil", currentSong.Title, currentSong.CoverArtId)
-			}
-		} else {
-			q.logger.Printf("error fetching cover art for %s: %v", currentSong.Title, err)
-		}
+		art = q.coverArtCache.Get(currentSong.CoverArtId)
 	}
 	q.coverArt.SetImage(art)
 	_ = q.songInfoTemplate.Execute(q.songInfo, currentSong)
