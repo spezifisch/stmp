@@ -19,6 +19,7 @@ import (
 	"github.com/spezifisch/stmps/logger"
 	"github.com/spezifisch/stmps/mpvplayer"
 	"github.com/spezifisch/stmps/subsonic"
+	"github.com/spf13/viper"
 )
 
 // TODO show total # of entries somewhere (top?)
@@ -70,15 +71,21 @@ func init() {
 }
 
 func (ui *Ui) createQueuePage() *QueuePage {
-	tmpl := template.New("song info").Funcs(template.FuncMap{
-		"formatTime": func(i int) string {
-			return (time.Duration(i) * time.Second).String()
-		},
-	})
-	songInfoTemplate, err := tmpl.Parse(songInfoTemplateString)
-	if err != nil {
-		ui.logger.PrintError("createQueuePage", err)
+	addSongInfo := !viper.GetBool("ui.hide-song-info")
+
+	var songInfoTemplate *template.Template
+	if addSongInfo {
+		tmpl := template.New("song info").Funcs(template.FuncMap{
+			"formatTime": func(i int) string {
+				return (time.Duration(i) * time.Second).String()
+			},
+		})
+		var err error
+		if songInfoTemplate, err = tmpl.Parse(songInfoTemplateString); err != nil {
+			ui.logger.PrintError("createQueuePage", err)
+		}
 	}
+
 	queuePage := QueuePage{
 		ui:               ui,
 		logger:           ui.logger,
@@ -153,71 +160,81 @@ func (ui *Ui) createQueuePage() *QueuePage {
 
 	queuePage.queueList.SetSelectionChangedFunc(queuePage.changeSelection)
 
-	queuePage.coverArt = tview.NewImage()
-	queuePage.coverArt.SetImage(STMPS_LOGO)
-
-	infoFlex := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(queuePage.songInfo, 0, 1, false).
-		AddItem(queuePage.coverArt, 0, 1, false)
-	infoFlex.SetBorder(true)
-	infoFlex.SetTitle(" song info ")
-
-	// flex wrapper
-	queuePage.Root = tview.NewFlex().SetDirection(tview.FlexColumn).
-		AddItem(queuePage.queueList, 0, 2, true).
-		AddItem(infoFlex, 0, 1, false)
-
 	// private data
 	queuePage.queueData = queueData{
 		starIdList: ui.starIdList,
 	}
 
-	queuePage.coverArtCache = NewCache(
-		// zero value
-		STMPS_LOGO,
-		// function that loads assets; can be slow
-		ui.connection.GetCoverArt,
-		// function that gets called when the actual asset is loaded
-		func(imgId string, img image.Image) {
-			row, _ := queuePage.queueList.GetSelection()
-			// If nothing is selected, set the image to the logo
-			if row >= len(queuePage.queueData.playerQueue) || row < 0 {
-				ui.app.QueueUpdate(func() {
-					queuePage.coverArt.SetImage(STMPS_LOGO)
-				})
-				return
-			}
-			// If the fetched asset isn't the asset for the current song,
-			// just skip it.
-			currentSong := queuePage.queueData.playerQueue[row]
-			if currentSong.CoverArtId != imgId {
-				return
-			}
-			// Otherwise, the asset is for the current song, so update it
-			ui.app.QueueUpdate(func() {
-				queuePage.coverArt.SetImage(img)
-			})
-		},
-		// function called to check if asset is invalid:
-		// true if it can be purged from the cache, false if it's still needed
-		func(assetId string) bool {
-			for _, song := range queuePage.queueData.playerQueue {
-				if song.CoverArtId == assetId {
-					return false
+	// flex wrapper
+	queuePage.Root = tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(queuePage.queueList, 0, 2, true)
+
+	if addSongInfo {
+		// Song info
+		queuePage.songInfo = tview.NewTextView()
+		queuePage.songInfo.SetDynamicColors(true).SetScrollable(true)
+
+		queuePage.coverArt = tview.NewImage()
+		queuePage.coverArt.SetImage(STMPS_LOGO)
+
+		infoFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(queuePage.songInfo, 0, 1, false).
+			AddItem(queuePage.coverArt, 0, 1, false)
+		infoFlex.SetBorder(true)
+		infoFlex.SetTitle(" song info ")
+		queuePage.Root.AddItem(infoFlex, 0, 1, false)
+
+		queuePage.coverArtCache = NewCache(
+			// zero value
+			STMPS_LOGO,
+			// function that loads assets; can be slow
+			ui.connection.GetCoverArt,
+			// function that gets called when the actual asset is loaded
+			func(imgId string, img image.Image) {
+				row, _ := queuePage.queueList.GetSelection()
+				// If nothing is selected, set the image to the logo
+				if row >= len(queuePage.queueData.playerQueue) || row < 0 {
+					ui.app.QueueUpdate(func() {
+						queuePage.coverArt.SetImage(STMPS_LOGO)
+					})
+					return
 				}
-			}
-			// Didn't find a song that needs the asset; purge it.
-			return true
-		},
-		// How frequently we check for invalid assets
-		time.Minute,
-		ui.logger,
-	)
+				// If the fetched asset isn't the asset for the current song,
+				// just skip it.
+				currentSong := queuePage.queueData.playerQueue[row]
+				if currentSong.CoverArtId != imgId {
+					return
+				}
+				// Otherwise, the asset is for the current song, so update it
+				ui.app.QueueUpdate(func() {
+					queuePage.coverArt.SetImage(img)
+				})
+			},
+			// function called to check if asset is invalid:
+			// true if it can be purged from the cache, false if it's still needed
+			func(assetId string) bool {
+				for _, song := range queuePage.queueData.playerQueue {
+					if song.CoverArtId == assetId {
+						return false
+					}
+				}
+				// Didn't find a song that needs the asset; purge it.
+				return true
+			},
+			// How frequently we check for invalid assets
+			time.Minute,
+			ui.logger,
+		)
+	}
 
 	return &queuePage
 }
 
 func (q *QueuePage) changeSelection(row, column int) {
+	// If the user disabled song info, there's nothing to do
+	if q.songInfo == nil {
+		return
+	}
 	q.songInfo.Clear()
 	if row >= len(q.queueData.playerQueue) || row < 0 || column < 0 {
 		q.coverArt.SetImage(STMPS_LOGO)
