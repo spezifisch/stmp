@@ -13,6 +13,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 
+	"github.com/spezifisch/stmps/commands"
 	"github.com/spezifisch/stmps/logger"
 	"github.com/spezifisch/stmps/mpvplayer"
 	"github.com/spezifisch/stmps/remote"
@@ -82,7 +83,7 @@ func parseConfig() {
 }
 
 // initCommandHandler sets up tview-command as main input handler
-func initCommandHandler(logger *logger.Logger) {
+func initCommandHandler(logger *logger.Logger) *tviewcommand.Config {
 	tviewcommand.SetLogHandler(func(msg string) {
 		logger.Print(msg)
 	})
@@ -93,10 +94,13 @@ func initCommandHandler(logger *logger.Logger) {
 	config, err := tviewcommand.LoadConfig(configPath)
 	if err != nil || config == nil {
 		logger.PrintError("Failed to load command-shortcut config", err)
+		return nil
 	}
 
-	//env := keybinding.SetupEnvironment()
+	// Register commands
 	//keybinding.RegisterCommands(env)
+
+	return config
 }
 
 // return codes:
@@ -158,7 +162,18 @@ func main() {
 	}
 
 	logger := logger.Init()
-	initCommandHandler(logger)
+
+	// init tview-command
+	tvcomConfig := initCommandHandler(logger)
+	if tvcomConfig == nil {
+		osExit(3)
+	}
+
+	// init the context stack (context-sensitive keybindings)
+	tvcomContextStack := tviewcommand.NewContextStack()
+
+	// init command registry (command parser and executor)
+	commandRegistry := commands.NewRegistry()
 
 	// init mpv engine
 	player, err := mpvplayer.NewPlayer(logger)
@@ -204,7 +219,7 @@ func main() {
 	connection.Scrobble = viper.GetBool("server.scrobble")
 	connection.RandomSongNumber = viper.GetUint("client.random-songs")
 
-	indexResponse, err := connection.GetIndexes()
+	indexResponse, err := connection.GetIndexes() // TODO how long does this take?
 	if err != nil {
 		fmt.Printf("Error fetching playlists from server: %s\n", err)
 		osExit(1)
@@ -248,11 +263,15 @@ func main() {
 
 	if headlessMode {
 		fmt.Println("Running in headless mode for testing.")
-		osExit(0)
+		osExit(0x23420002)
 		return
 	}
 
-	ui := InitGui(&indexResponse.Indexes.Index,
+	ui := InitGui(
+		tvcomConfig,
+		tvcomContextStack,
+		commandRegistry,
+		&indexResponse.Indexes.Index,
 		connection,
 		player,
 		logger,

@@ -8,16 +8,25 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/spezifisch/stmps/commands"
 	"github.com/spezifisch/stmps/logger"
 	"github.com/spezifisch/stmps/mpvplayer"
 	"github.com/spezifisch/stmps/remote"
 	"github.com/spezifisch/stmps/subsonic"
+	tviewcommand "github.com/spezifisch/tview-command"
 )
 
 // struct contains all the updatable elements of the Ui
 type Ui struct {
 	app   *tview.Application
 	pages *tview.Pages
+
+	// keybindings, managed by tview-command
+	keyConfig       *tviewcommand.Config
+	keyContextStack *tviewcommand.ContextStack
+
+	// command registry, managed by stmps (for now)
+	commandRegistry *commands.CommandRegistry
 
 	// top bar
 	startStopStatus *tview.TextView
@@ -77,12 +86,19 @@ const (
 	PageSelectPlaylist = "selectPlaylist"
 )
 
-func InitGui(indexes *[]subsonic.SubsonicIndex,
+func InitGui(
+	tvcomConfig *tviewcommand.Config,
+	tvcomContextStack *tviewcommand.ContextStack,
+	commandRegistry *commands.CommandRegistry,
+	indexes *[]subsonic.SubsonicIndex,
 	connection *subsonic.SubsonicConnection,
 	player *mpvplayer.Player,
 	logger *logger.Logger,
 	mprisPlayer *remote.MprisPlayer) (ui *Ui) {
 	ui = &Ui{
+		keyConfig:       tvcomConfig,
+		keyContextStack: tvcomContextStack,
+
 		starIdList: map[string]struct{}{},
 
 		eventLoop: nil, // initialized by initEventLoops()
@@ -94,6 +110,10 @@ func InitGui(indexes *[]subsonic.SubsonicIndex,
 		logger:      logger,
 		mprisPlayer: mprisPlayer,
 	}
+
+	logger.Print("tc: Init")
+	ui.keyContextStack.Push("Init")
+	ui.commandRegistry = commandRegistry
 
 	ui.initEventLoops()
 
@@ -186,14 +206,22 @@ func InitGui(indexes *[]subsonic.SubsonicIndex,
 		AddItem(ui.pages, 0, 1, true).
 		AddItem(ui.menuWidget.Root, 1, 0, false)
 
+	// add commands
+	logger.Print("tc: Adding Ui commands")
+	ui.registerCommands(ui.commandRegistry)
+
 	// add main input handler
+	logger.Print("tc: Adding input handler")
 	rootFlex.SetInputCapture(ui.handlePageInput)
 
 	ui.app.SetRoot(rootFlex, true).
 		SetFocus(rootFlex).
 		EnableMouse(true)
 
-	ui.playlistPage.UpdatePlaylists()
+	if !testMode {
+		// this connects to the subsonic server, so exclude it for tests
+		ui.playlistPage.UpdatePlaylists()
+	}
 
 	return ui
 }
@@ -201,6 +229,9 @@ func InitGui(indexes *[]subsonic.SubsonicIndex,
 func (ui *Ui) Run() error {
 	// receive events from mpv wrapper
 	ui.player.RegisterEventConsumer(ui)
+
+	// leave init key context
+	ui.keyContextStack.PopExpect("Init")
 
 	// run gui/background event handler
 	ui.runEventLoops()
@@ -213,6 +244,7 @@ func (ui *Ui) Run() error {
 }
 
 func (ui *Ui) ShowHelp() {
+	ui.keyContextStack.Push("Help")
 	activePage := ui.menuWidget.GetActivePage()
 	ui.helpWidget.RenderHelp(activePage)
 
@@ -223,11 +255,13 @@ func (ui *Ui) ShowHelp() {
 }
 
 func (ui *Ui) CloseHelp() {
+	ui.keyContextStack.PopExpect("Help")
 	ui.helpWidget.visible = false
 	ui.pages.HidePage(PageHelpBox)
 }
 
 func (ui *Ui) ShowSelectPlaylist() {
+	ui.keyContextStack.Push("SelectPlaylist")
 	ui.pages.ShowPage(PageSelectPlaylist)
 	ui.pages.SendToFront(PageSelectPlaylist)
 	ui.app.SetFocus(ui.selectPlaylistModal)
@@ -235,6 +269,7 @@ func (ui *Ui) ShowSelectPlaylist() {
 }
 
 func (ui *Ui) CloseSelectPlaylist() {
+	ui.keyContextStack.PopExpect("SelectPlaylist")
 	ui.pages.HidePage(PageSelectPlaylist)
 	ui.selectPlaylistWidget.visible = false
 }

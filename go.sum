@@ -51,8 +51,8 @@ github.com/sagikazarmark/slog-shim v0.1.0 h1:diDBnUNK9N/354PgrxMywXnAwEr1QZcOr6g
 github.com/sagikazarmark/slog-shim v0.1.0/go.mod h1:SrcSrq8aKtyuqEI1uvTDTK1arOWRIczQRv+GVI1AkeQ=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
-github.com/spezifisch/tview-command v0.0.0-20241013143719-94366d6323e2 h1:rhNWDM0v9HbwuF5I8wvOW3bsCdiZ1KRnp7uvhp3Jw+Y=
-github.com/spezifisch/tview-command v0.0.0-20241013143719-94366d6323e2/go.mod h1:BmHPVRuS00KaY6eP3VAoPJVlfN0Fulajx3Dw9CwKfFw=
+github.com/spezifisch/tview-command v0.0.0-20241014231909-8cf60c7b94e5 h1:pMUWJp+61LbdF6B9yb0acoescbPval2WxQ9gfFHPqJk=
+github.com/spezifisch/tview-command v0.0.0-20241014231909-8cf60c7b94e5/go.mod h1:ctJ/3e6RYpK+O9M1kFxkUFInR13DOeQmik5wZiJ5WNk=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
 github.com/spf13/afero v1.11.0/go.mod h1:GH9Y3pIexgf1MTIWtNGyogA5MwRIDXGUr+hbWNoBjkY=
 github.com/spf13/cast v1.7.0 h1:ntdiHjuueXFgm5nzDRdOS4yfT43P5Fnud6DH50rz/7w=
