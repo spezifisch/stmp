@@ -268,6 +268,7 @@ func (q *QueuePage) updateQueue() {
 		q.queueList.ScrollToBeginning()
 	}
 
+	q.queueList.Box.SetTitle(fmt.Sprintf(" queue (%d) ", q.queueList.GetRowCount()))
 	r, c := q.queueList.GetSelection()
 	q.changeSelection(r, c)
 }

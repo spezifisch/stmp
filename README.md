@@ -177,13 +177,16 @@ In any of the columns:
 - `Enter` / `a`: Adds the selected item recursively to the queue.
 - Left/right arrow keys (`←`, `→`) navigate between the columns
 - Up/down arrow keys (`↓`, `↑`) navigate the selected column list
+- `g`: toggle genre search
 
 In the search field:
 
 - `Enter`: Perform the query.
 - `Escape`: Escapes into the columns, where the global key bindings work.
 
-Note that the Search page is *not* a browser like the Browser page: it displays the search results returned by the server. Selecting a different artist will not change the album or song search results. OpenSubsonic servers implement the search function differently; in gonic, if you search for "black", you will get artists with "black" in their names in the artists column; albums with "black" in their titles in the albums column; and songs with "black" in their titles in the songs column. Navidrome appears to include all results with "black" anywhere in their IDv3 metadata. Since the API search results filteres these matches into sections -- artists, albums, and songs -- this means that, with Navidrome, you may see albums that don't have "black" in their names; maybe "black" is in their artist title.
+Note that the Search page is *not* a browser like the Browser page: it displays the search results returned by the server. Selecting a different artist will not change the album or song search results.
+
+In Genre Search mode, the genres known by the server are displayed in the middle column. Pressing `Enter` on one of these will load all of the songs with that genre in the third column. Searching with the search field will fill the third column with songs whose genres match the search. Searching for a genre by typing it in should return the same songs as selecting it in the middle column. Note that genre searches may (depending on your Subsonic server's search implementation) be case sensitive.
 
 ## Advanced Configuration and Features
 
