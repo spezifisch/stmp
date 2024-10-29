@@ -9,6 +9,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/spezifisch/stmps/mpvplayer"
 	"github.com/spezifisch/stmps/subsonic"
+	"github.com/spf13/viper"
 )
 
 func (ui *Ui) handlePageInput(event *tcell.EventKey) *tcell.EventKey {
@@ -135,6 +136,9 @@ func (ui *Ui) Quit() {
 		// The only way to purge a saved play queue is to force an error by providing
 		// bad data. Therefore, we ignore errors.
 		_ = ui.connection.SavePlayQueue([]string{"XXX"}, "XXX", 0)
+	}
+	if !viper.GetBool("ui.hide-song-info") {
+		ui.queuePage.coverArtCache.Close()
 	}
 	ui.player.Quit()
 	ui.app.Stop()

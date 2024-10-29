@@ -35,7 +35,6 @@ type SubsonicConnection struct {
 
 	logger         logger.LoggerInterface
 	directoryCache map[string]SubsonicResponse
-	coverArts      map[string]image.Image
 }
 
 func Init(logger logger.LoggerInterface) *SubsonicConnection {
@@ -45,7 +44,6 @@ func Init(logger logger.LoggerInterface) *SubsonicConnection {
 
 		logger:         logger,
 		directoryCache: make(map[string]SubsonicResponse),
-		coverArts:      make(map[string]image.Image),
 	}
 }
 
@@ -384,17 +382,13 @@ func (connection *SubsonicConnection) GetMusicDirectory(id string) (*SubsonicRes
 	return resp, nil
 }
 
-// GetCoverArt fetches album art from the server, by ID. The results are cached,
-// so it is safe to call this function repeatedly. If id is empty, an error
-// is returned. If, for some reason, the server response can't be parsed into
-// an image, an error is returned. This function can parse GIF, JPEG, and PNG
-// images.
+// GetCoverArt fetches album art from the server, by ID. If id is empty, an
+// error is returned. If, for some reason, the server response can't be parsed
+// into an image, an error is returned. This function can parse GIF, JPEG, and
+// PNG images.
 func (connection *SubsonicConnection) GetCoverArt(id string) (image.Image, error) {
 	if id == "" {
 		return nil, fmt.Errorf("GetCoverArt: no ID provided")
-	}
-	if rv, ok := connection.coverArts[id]; ok {
-		return rv, nil
 	}
 	query := defaultQuery(connection)
 	query.Set("id", id)
@@ -432,10 +426,6 @@ func (connection *SubsonicConnection) GetCoverArt(id string) (image.Image, error
 		art, err = gif.Decode(bytes.NewReader(responseBody))
 	default:
 		return nil, fmt.Errorf("[%s] unhandled image type %s: %v", caller, res.Header["Content-Type"][0], err)
-	}
-	if art != nil {
-		// FIXME connection.coverArts shouldn't grow indefinitely. Add some LRU cleanup after loading a few hundred cover arts.
-		connection.coverArts[id] = art
 	}
 	return art, err
 }

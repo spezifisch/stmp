@@ -94,6 +94,15 @@ random-songs = 50
 spinner = '▁▂▃▄▅▆▇█▇▆▅▄▃▂▁'
 ```
 
+The song info panel on the queue takes up space, and memory for album art. You can disable this panel with:
+
+```toml
+[ui]
+hide-info-panel = true
+```
+
+If the panel is hidden, no album art will be fetched from the server.
+
 ## Usage
 
 ### General Navigation
