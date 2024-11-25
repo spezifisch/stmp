@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/spezifisch/tview-command v0.0.0-20241013143719-94366d6323e2
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/supersonic-app/go-mpv v0.1.0
 )
 
