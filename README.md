@@ -135,6 +135,7 @@ These controls are accessible from any view:
 - `d`/`Delete`: Remove currently selected song from the queue
 - `D`: Remove all songs from queue
 - `y`: Toggle star on song
+- `i`: Toggle song info panel
 - `k`: Move song up in queue
 - `j`: Move song down in queue
 - `s`: Save the queue as a playlist

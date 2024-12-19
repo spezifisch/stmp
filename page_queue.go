@@ -45,6 +45,7 @@ type QueuePage struct {
 	queueList *tview.Table
 	queueData queueData
 
+	infoFlex *tview.Flex
 	songInfo *tview.TextView
 	coverArt *tview.Image
 
@@ -133,7 +134,12 @@ func (ui *Ui) createQueuePage() *QueuePage {
 						_ = ui.player.Pause()
 					}
 				}()
-
+			case 'i':
+				if queuePage.Root.GetItemCount() == 2 {
+					queuePage.Root.RemoveItem(queuePage.infoFlex)
+				} else {
+					queuePage.Root.AddItem(queuePage.infoFlex, 0, 1, false)
+				}
 			default:
 				return event
 			}
@@ -154,16 +160,16 @@ func (ui *Ui) createQueuePage() *QueuePage {
 	queuePage.coverArt = tview.NewImage()
 	queuePage.coverArt.SetImage(STMPS_LOGO)
 
-	infoFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+	queuePage.infoFlex = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(queuePage.songInfo, 0, 1, false).
 		AddItem(queuePage.coverArt, 0, 1, false)
-	infoFlex.SetBorder(true)
-	infoFlex.SetTitle(" song info ")
+	queuePage.infoFlex.SetBorder(true)
+	queuePage.infoFlex.SetTitle(" song info ")
 
 	// flex wrapper
 	queuePage.Root = tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(queuePage.queueList, 0, 2, true).
-		AddItem(infoFlex, 0, 1, false)
+		AddItem(queuePage.infoFlex, 0, 1, false)
 
 	// private data
 	queuePage.queueData = queueData{
