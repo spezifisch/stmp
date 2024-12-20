@@ -151,6 +151,11 @@ func (p *Player) IsSongLoaded() (bool, error) {
 	return !idle, err
 }
 
+func (p *Player) IsSeekable() (bool, error) {
+	seekable, err := p.getPropertyBool("seekable")
+	return seekable, err
+}
+
 func (p *Player) IsPaused() (bool, error) {
 	pause, err := p.getPropertyBool("pause")
 	return pause, err

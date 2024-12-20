@@ -127,10 +127,16 @@ func (ui *Ui) createQueuePage() *QueuePage {
 						if err := ui.player.Play(); err != nil {
 							queuePage.logger.Printf("error playing: %s", err)
 						}
+						_ = ui.player.Pause()
+						for {
+							if seekable, err := ui.player.IsSeekable(); err == nil && seekable {
+								break
+							}
+							time.Sleep(100 * time.Millisecond)
+						}
 						if err = ui.player.Seek(ssr.PlayQueue.Position); err != nil {
 							queuePage.logger.Printf("unable to seek to position %s: %s", time.Duration(ssr.PlayQueue.Position)*time.Second, err)
 						}
-						_ = ui.player.Pause()
 					}
 				}()
 
