@@ -263,21 +263,24 @@ type SubsonicPlaylist struct {
 }
 
 type SubsonicResponse struct {
-	Status        string            `json:"status"`
-	Version       string            `json:"version"`
-	Indexes       SubsonicIndexes   `json:"indexes"`
-	Directory     SubsonicDirectory `json:"directory"`
-	RandomSongs   SubsonicSongs     `json:"randomSongs"`
-	SimilarSongs  SubsonicSongs     `json:"similarSongs"`
-	Starred       SubsonicResults   `json:"starred"`
-	Playlists     SubsonicPlaylists `json:"playlists"`
-	Playlist      SubsonicPlaylist  `json:"playlist"`
-	Error         SubsonicError     `json:"error"`
-	Artist        Artist            `json:"artist"`
-	Album         Album             `json:"album"`
-	SearchResults SubsonicResults   `json:"searchResult3"`
-	ScanStatus    ScanStatus        `json:"scanStatus"`
-	PlayQueue     PlayQueue         `json:"playQueue"`
+	Status                 string            `json:"status"`
+	Version                string            `json:"version"`
+	Indexes                SubsonicIndexes   `json:"indexes"`
+	Directory              SubsonicDirectory `json:"directory"`
+	RandomSongs            SubsonicSongs     `json:"randomSongs"`
+	SimilarSongs           SubsonicSongs     `json:"similarSongs"`
+	Starred                SubsonicResults   `json:"starred"`
+	Playlists              SubsonicPlaylists `json:"playlists"`
+	Playlist               SubsonicPlaylist  `json:"playlist"`
+	Error                  SubsonicError     `json:"error"`
+	Artist                 Artist            `json:"artist"`
+	Album                  Album             `json:"album"`
+	SearchResults          SubsonicResults   `json:"searchResult3"`
+	ScanStatus             ScanStatus        `json:"scanStatus"`
+	PlayQueue              PlayQueue         `json:"playQueue"`
+	LyricsList             LyricsList        `json:"lyricsList"`
+	OpenSubsonic           bool
+	OpenSubsonicExtensions []Extension
 }
 
 type responseWrapper struct {
@@ -438,6 +441,48 @@ func (connection *SubsonicConnection) GetCoverArt(id string) (image.Image, error
 		connection.coverArts[id] = art
 	}
 	return art, err
+}
+
+// GetLyricsBySongId fetches time synchronized song lyrics. If the server does
+// not support this, an error is returned.
+func (connection *SubsonicConnection) GetLyricsBySongId(id string) ([]StructuredLyrics, error) {
+	if id == "" {
+		return []StructuredLyrics{}, fmt.Errorf("GetLyricsBySongId: no ID provided")
+	}
+	query := defaultQuery(connection)
+	query.Set("id", id)
+	query.Set("f", "json")
+	caller := "GetLyricsBySongId"
+	res, err := http.Get(connection.Host + "/rest/getLyricsBySongId" + "?" + query.Encode())
+	if err != nil {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] failed to make GET request: %v", caller, err)
+	}
+
+	if res.Body != nil {
+		defer res.Body.Close()
+	} else {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] response body is nil", caller)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] unexpected status code: %d, status: %s", caller, res.StatusCode, res.Status)
+	}
+
+	if len(res.Header["Content-Type"]) == 0 {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] unknown image type (no content-type from server)", caller)
+	}
+
+	responseBody, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] failed to read response body: %v", caller, readErr)
+	}
+
+	var decodedBody responseWrapper
+	err = json.Unmarshal(responseBody, &decodedBody)
+	if err != nil {
+		return []StructuredLyrics{}, fmt.Errorf("[%s] failed to unmarshal response body: %v", caller, err)
+	}
+	return decodedBody.Response.LyricsList.StructuredLyrics, nil
 }
 
 func (connection *SubsonicConnection) GetRandomSongs(Id string, randomType string) (*SubsonicResponse, error) {
@@ -687,4 +732,63 @@ func (connection *SubsonicConnection) LoadPlayQueue() (*SubsonicResponse, error)
 	query := defaultQuery(connection)
 	requestUrl := fmt.Sprintf("%s/rest/getPlayQueue?%s", connection.Host, query.Encode())
 	return connection.getResponse("GetPlayQueue", requestUrl)
+}
+
+func (connection *SubsonicConnection) HasOpenSubsonicExtension(feature string) bool {
+	info, err := connection.GetServerInfo()
+	if err != nil {
+		connection.logger.PrintError("HasOpenSubsonicExtension", err)
+		return false
+	}
+	if !info.OpenSubsonic {
+		return false
+	}
+	query := defaultQuery(connection)
+	requestUrl := connection.Host + "/rest/getOpenSubsonicExtensions" + "?" + query.Encode()
+	resp, err := connection.getResponse("GetOpenSubsonicExtensions", requestUrl)
+	if err != nil {
+		return false
+	}
+	m := major(info.Version)
+	for _, e := range resp.OpenSubsonicExtensions {
+		if e.Name == feature {
+			for _, v := range e.Versions {
+				if v == m {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func major(version string) int {
+	parts := strings.Split(version, ".")
+	if len(parts) > 1 {
+		rv, e := strconv.Atoi(parts[0])
+		if e == nil {
+			return rv
+		}
+	}
+	return 0
+}
+
+type LyricsList struct {
+	StructuredLyrics []StructuredLyrics `json:"structuredLyrics"`
+}
+
+type StructuredLyrics struct {
+	Lang   string       `json:"lang"`
+	Synced bool         `json:"synced"`
+	Lines  []LyricsLine `json:"line"`
+}
+
+type LyricsLine struct {
+	Start int64  `json:"start"`
+	Value string `json:"value"`
+}
+
+type Extension struct {
+	Name     string
+	Versions []int
 }

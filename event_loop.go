@@ -65,13 +65,44 @@ func (ui *Ui) guiEventLoop() {
 
 				ui.app.QueueUpdateDraw(func() {
 					ui.playerStatus.SetText(formatPlayerStatus(statusData.Volume, statusData.Position, statusData.Duration))
+					if ui.queuePage.lyrics != nil {
+						cl := ui.queuePage.currentLyrics.Lines
+						lcl := len(cl)
+						if lcl == 0 {
+							ui.queuePage.lyrics.SetText("\n[::i]No lyrics[-:-:-]")
+						} else {
+							// We only get an update every second or so, and Position is truncated
+							// to seconds. Make sure that, by the time our tick comes, we're already showing
+							// the lyric that's being sung. Do this by pretending that we're a half-second
+							// in the future
+							p := statusData.Position*1000 + 500
+							_, _, _, fh := ui.queuePage.lyrics.GetInnerRect()
+							for i := 0; i < lcl-1; i++ {
+								if p >= cl[i].Start && p < cl[i+1].Start {
+									txt := ""
+									if i > 0 {
+										txt = cl[i-1].Value + "\n"
+									}
+									txt += "[::b]" + cl[i].Value + "[-:-:-]\n"
+									for k := i + 1; k < lcl && k-i < fh; k++ {
+										txt += cl[k].Value + "\n"
+									}
+									ui.queuePage.lyrics.SetText(txt)
+									break
+								}
+							}
+						}
+					}
 				})
 
 			case mpvplayer.EventStopped:
 				ui.logger.Print("mpvEvent: stopped")
 				ui.app.QueueUpdateDraw(func() {
 					ui.startStopStatus.SetText("[red::b]Stopped[::-]")
-					ui.queuePage.UpdateQueue()
+					if ui.queuePage.lyrics != nil {
+						ui.queuePage.lyrics.SetText("")
+					}
+					ui.queuePage.updateQueue()
 				})
 
 			case mpvplayer.EventPlaying:
@@ -114,7 +145,14 @@ func (ui *Ui) guiEventLoop() {
 
 				ui.app.QueueUpdateDraw(func() {
 					ui.startStopStatus.SetText(statusText)
-					ui.queuePage.UpdateQueue()
+					ui.queuePage.updateQueue()
+					if ui.queuePage.lyrics != nil {
+						if len(ui.queuePage.currentLyrics.Lines) == 0 {
+							ui.queuePage.lyrics.SetText("\n[::i]No lyrics[-:-:-]")
+						} else {
+							ui.queuePage.lyrics.SetText("")
+						}
+					}
 				})
 
 			case mpvplayer.EventPaused:
